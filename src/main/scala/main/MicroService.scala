@@ -4,6 +4,8 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.Await
+import scala.concurrent.duration._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
@@ -23,13 +25,13 @@ trait TransferRequestJsonSupport extends SprayJsonSupport with DefaultJsonProtoc
   implicit val transferResponseFormat = jsonFormat1(TransferResponse)
 }
 
-class TransferRequestEndpoint(accountRepository: AccountService)
+class TransferRequestEndpoint(accountService: AccountService)
                              (implicit ec:ExecutionContext) extends TransferRequestJsonSupport {
   val routes = {
     pathPrefix("transfer") {
       (post & entity(as[TransferRequest])) { tr =>
         complete {
-          accountRepository.transfer(tr.from, tr.to, tr.amount).map[ToResponseMarshallable] {
+          accountService.transfer(tr.from, tr.to, tr.amount).map[ToResponseMarshallable] {
             case Right(_) => StatusCodes.OK -> TransferResponse("Ok")
             case Left(error) => StatusCodes.BadRequest -> TransferResponse(error)
           }
@@ -44,12 +46,18 @@ object MicroService extends App {
   implicit val materializer = ActorMaterializer()
   implicit val ec = system.dispatcher
 
+  //db init - replace with production db (e.g. Postgres) in real service
   val database = Database.forConfig("accountDbH2")
-
-  val accountRepository = new AccountService(new AccountDBIO with H2Component {
+  val dbio = new AccountDBIO with H2Component {
     val db = database
-  })
-  val transferRequestEndpoint = new TransferRequestEndpoint(accountRepository)
+  }
+
+  //since we are using H2 here, we load test data so that there's something
+  //to demonstrate the service work
+  Await.result(dbio.db.run(dbio.resetWith(ExampleData.data)), 1.seconds)
+
+  val accountService = new AccountService(dbio)
+  val transferRequestEndpoint = new TransferRequestEndpoint(accountService)
 
   Http().bindAndHandle(transferRequestEndpoint.routes,"0.0.0.0",8080)
 }

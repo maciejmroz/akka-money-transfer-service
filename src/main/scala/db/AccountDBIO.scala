@@ -1,16 +1,25 @@
 package db
 
-import model.AccountId
+import model.{Account, AccountId}
 
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success, Try}
 
-//TODO: Get rid of inheritance here.
+//TODO: Is it possible to get rid of inheritance here?
 //This design does not extend into DBIOs involving multiple tables (joins in SQL)
 //The problem is that everything depends on the same JdbcProfile ... need to think about it :)
+//Instead of AccountTable use Schema with all tables?
 class AccountDBIO extends AccountTable { self: DBComponent =>
 
   import profile.api._
+
+  def resetWith(data: Seq[Account])(implicit ec: ExecutionContext) : DBIO[Try[Unit]] = {
+    DBIO.seq(
+      query.schema.drop.asTry, //we swallow exception here so this method can be used on empty DB
+      query.schema.create,
+      query ++= data
+    ).asTry
+  }
 
   def deposit(accountId: AccountId, depositAmount: BigDecimal)
              (implicit ec: ExecutionContext) : DBIO[Try[Int]] = {
@@ -40,7 +49,7 @@ class AccountDBIO extends AccountTable { self: DBComponent =>
               (implicit ec: ExecutionContext) : DBIO[Try[Int]] = {
     withdraw(fromAccountId, transferAmount).flatMap {
       case Success(_) => deposit(toAccountId, transferAmount)
-      case Failure(e) => DBIO.failed(e)
+      case Failure(e) => DBIO.failed(e).asTry
     }.transactionally
   }
 }
