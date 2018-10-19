@@ -1,6 +1,6 @@
 package db
 
-import model.{Account, AccountId}
+import domain.{Account, AccountId}
 
 import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success, Try}
@@ -21,7 +21,7 @@ class AccountDBIO extends AccountTable { self: DBComponent =>
     ).asTry
   }
 
-  def deposit(accountId: AccountId, depositAmount: BigDecimal)
+  private def deposit(accountId: AccountId, depositAmount: BigDecimal)
              (implicit ec: ExecutionContext) : DBIO[Try[Int]] = {
     val target = query
       .filter(_.id === accountId)
@@ -33,7 +33,7 @@ class AccountDBIO extends AccountTable { self: DBComponent =>
   }
 
   //withdraw makes sure that balance cannot become negative
-  def withdraw(accountId: AccountId, withdrawAmount: BigDecimal)
+  private def withdraw(accountId: AccountId, withdrawAmount: BigDecimal)
               (implicit ec: ExecutionContext) : DBIO[Try[Int]] = {
     val target = query
       .filter(r => (r.id === accountId) && (r.balance >= withdrawAmount))

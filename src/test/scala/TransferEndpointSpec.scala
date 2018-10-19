@@ -7,18 +7,17 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.ContentTypes._
 import slick.jdbc.H2Profile.api._
 import db.{AccountDBIO, H2Component}
-import main.{ExampleData, TransferEndpoint, TransferRequest, TransferResponse}
-import service.AccountService
+import endpoints.{TransferEndpoint, TransferRequest, TransferResponse}
+import main.ExampleData
+import services.AccountService
 
-class TransferEndpointSpec extends FlatSpec with Matchers with ScalatestRouteTest {
+class TransferEndpointSpec extends FlatSpec with Matchers with ScalatestRouteTest with BeforeAndAfterEach {
 
   //TODO: It's a copy of setup in MicroService object so it's tempting to refactor and remove code duplication
   val database = Database.forConfig("accountDbH2")
   val dbio = new AccountDBIO with H2Component {
     val db = database
   }
-
-  Await.result(dbio.db.run(dbio.resetWith(ExampleData.data)), 1.seconds)
 
   val accountService = new AccountService(dbio)
   val transferRequestEndpoint = new TransferEndpoint(accountService)
@@ -27,8 +26,12 @@ class TransferEndpointSpec extends FlatSpec with Matchers with ScalatestRouteTes
   //(which probably shouldn't be done anyway)
   import transferRequestEndpoint._
 
-  //tests
+  //reset DB to initial state before every test
+  override def beforeEach(): Unit = {
+    Await.result(dbio.db.run(dbio.resetWith(ExampleData.data)), 1.seconds)
+  }
 
+  //tests
   "/transfer endpoint" should "respond with OK to valid request" in {
     Post(s"/transfer", TransferRequest(1,2,10.5)) ~> routes ~> check {
       status shouldBe OK

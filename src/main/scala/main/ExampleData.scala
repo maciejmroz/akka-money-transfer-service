@@ -1,6 +1,6 @@
 package main
 
-import model.Account
+import domain.Account
 
 object ExampleData {
 

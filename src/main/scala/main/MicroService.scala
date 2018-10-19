@@ -6,9 +6,9 @@ import akka.stream.ActorMaterializer
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
-
 import db.{AccountDBIO, H2Component}
-import service.AccountService
+import endpoints.TransferEndpoint
+import services.AccountService
 import slick.jdbc.H2Profile.api._
 
 object MicroService extends App {

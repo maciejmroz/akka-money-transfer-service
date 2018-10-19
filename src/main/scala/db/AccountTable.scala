@@ -1,9 +1,11 @@
 package db
 
-import model.{Account, AccountId}
+import domain.{Account, AccountId}
 
 trait AccountTable { self: DBComponent =>
   import profile.api._
+
+  implicit lazy val accountIdColumnType = MappedColumnType.base[AccountId, Long](_.value, AccountId)
 
   class AccountTable(tag: Tag) extends Table[Account](tag, "accounts") {
 
