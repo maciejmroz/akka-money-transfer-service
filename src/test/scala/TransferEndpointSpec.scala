@@ -5,6 +5,8 @@ import scala.concurrent.duration._
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.ContentTypes._
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
+import akka.http.scaladsl.server.Route
 import slick.jdbc.H2Profile.api._
 import db.{AccountDBIO, H2Component}
 import endpoints.{TransferEndpoint, TransferRequest, TransferResponse}
@@ -31,7 +33,34 @@ class TransferEndpointSpec extends FlatSpec with Matchers with ScalatestRouteTes
     Await.result(dbio.db.run(dbio.resetWith(ExampleData.data)), 1.seconds)
   }
 
-  //tests
+  //contract tests
+  "/transfer JSON contract" should "accept correct JSON request" in {
+    val httpEntity = HttpEntity(ContentTypes.`application/json`,"""{"from":1,"to":2,"amount":10.5}""")
+    Post(s"/transfer", httpEntity) ~> routes ~> check {
+      status shouldBe OK
+      contentType shouldBe `application/json`
+      responseAs[String] shouldBe """{"status":"Ok"}"""
+    }
+  }
+
+  it should "accept JSON with unknown fields, otherwise correct" in {
+    val httpEntity = HttpEntity(ContentTypes.`application/json`,"""{"from":1,"to":2,"amount":10.5,"foo":"bar"}""")
+    Post(s"/transfer", httpEntity) ~> routes ~> check {
+      status shouldBe OK
+      contentType shouldBe `application/json`
+      responseAs[String] shouldBe """{"status":"Ok"}"""
+    }
+  }
+
+  //TODO: custom rejection handler, so this test does not rely on default Akka rejection handling
+  it should "reject JSON with missing fields" in {
+    val httpEntity = HttpEntity(ContentTypes.`application/json`,"""{"from":1,"amount":10.5}""")
+    Post(s"/transfer", httpEntity) ~> Route.seal(routes) ~> check {
+      status shouldBe BadRequest
+    }
+  }
+
+  //functional tests
   "/transfer endpoint" should "respond with OK to valid request" in {
     Post(s"/transfer", TransferRequest(1,2,10.5)) ~> routes ~> check {
       status shouldBe OK
